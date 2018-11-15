@@ -1,0 +1,268 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+        <meta name="description" content="">
+        <meta name="author" content="강필구">
+
+        <title>정보시각화</title>
+
+        <script src="https://d3js.org/d3.v5.min.js"></script>
+        <style>
+            @charset "utf-8"; *{margin:0;padding:0;}
+            html, body {margin: 0px; padding: 0px; border: 0px; width: 100%; height: 100%; -webkit-font-smoothing: antialiased; background-color: #fff; }
+            .row{ font-size: 0px; display: block;}
+            .row .col { display: inline-block; font-size: 12px; width: 50%; vertical-align: top; min-width: 700px;}
+            .text-center{ text-align: center;}
+            .text-right{ text-align: right;}
+            h1{font-size: 24px;}
+            h2{font-size: 16px;}
+            #scatterplot,#barplot { width: 100%; min-height: 500px; }
+        </style>
+    </head>
+    <body>
+        <div class="row text-center">
+            <h1>정보시각화</h1>
+        </div>
+        <!--/.row-->
+
+        <div class="row">
+            <div class="col">
+                <div class="row text-center">
+                    <h2>Scatter Plot</h2>
+                </div>
+                <!--/.row-->
+                <div class="row">
+                    <div class="row">
+                        <button onclick="scatter.dataset_update();">Update</button>
+                    </div>
+                    <!--/.row-->
+                    <div id="scatterplot"></div>
+                </div>
+                <!--/.row-->
+            </div>
+            <!--/.col-->
+            <div class="col">
+                <div class="row text-center">
+                    <h2>Bar Plot</h2>
+                </div>
+                <!--/.row-->
+                <div class="row">
+                    <div class="row">
+                        <button onclick="bar.dataset_update();">Update</button>
+                    </div>
+                    <!--/.row-->
+                    <svg id="barplot"></svg>
+
+                    <br />
+                    <div style="font-size: 14px;">
+                        조교님, 바그래프도 animation 넣야하는지 잘 몰라서 우선 animation 넣었습니다. 혹시 이게 문제가 되면 수정해서 다시 제출하겠습니다. 감사합니다!
+                    </div>
+                </div>
+                <!--/.row-->
+            </div>
+            <!--/.col-->
+        </div>
+        <!--/.row-->
+    </body>
+    <script>
+        var helper = (function() {
+            var that = {};
+            that.getRandomNumber = function(min, max) { return Math.floor((Math.random() * max) + min); };
+            that.getElementSize = function() { return { "height" : 600, "width" : 600 }; };
+            return that;
+        })();
+        var scatter = (function() {
+            var that = { "svg"   : "", "xaxis" : "", "yaxis" : "", "count" : 100 };
+            that.getData = function() {
+
+                var seedx = parseInt(helper.getRandomNumber(0, 80));
+                var seedy = parseInt(helper.getRandomNumber(0, 150));
+
+                var return_data = { "table_data" : [] };
+
+                do {
+                    return_data.table_data.push({
+                        "x"     : parseInt(helper.getRandomNumber((80 + seedx), (300 + seedy))),
+                        "y"     : parseInt(helper.getRandomNumber((80 + seedx), (300 + seedy))),
+                        "size"  : parseInt(helper.getRandomNumber(3, 14)),
+                        "color" : "hsl(" + Math.random() * 360 + ",100%,50%)"
+                     });
+                } while(return_data.table_data.length < that.count);
+
+                return_data.elemSize    = helper.getElementSize();
+                return_data.margin      = {top: 20, right: 18, bottom: 30, left: 40};
+                return_data.width       = return_data.elemSize.width - return_data.margin.left - return_data.margin.right;
+                return_data.height      = return_data.elemSize.height - return_data.margin.top - return_data.margin.bottom;
+
+                return return_data;
+            };
+            that.getXScale = function(table_data, width) {
+                return d3.scaleLinear().domain([d3.min(table_data, d => (d.x - d.size)), d3.max(table_data, d => (d.x + d.size))]).range([0, width]);
+            };
+            that.getYScale = function(table_data, height) {
+                return d3.scaleLinear().domain([d3.min(table_data, d => (d.y - d.size)), d3.max(table_data, d => (d.y + d.size))]).range([height, 0]);
+            };
+            that.translate = function(x, y) { return 'translate(' + x + ', ' + y + ')'; };
+            that.init = function() {
+
+                let config_data = that.getData();
+
+                that.svg = d3.select("#scatterplot")
+                            .append('svg').attr('width', config_data.elemSize.width).attr('height', config_data.elemSize.height)
+                            .append('g').attr('transform', scatter.translate(config_data.margin.left, config_data.margin.top));
+
+                let x = that.getXScale(config_data.table_data, config_data.width);
+                let y = that.getYScale(config_data.table_data, config_data.height);
+
+                that.svg.selectAll('circle').data(config_data.table_data)
+                    .enter()
+                        .append('circle')
+                        .attr('r', d => d.size)
+                        .attr('cx', d => x(d.x))
+                        .attr('cy', d => y(d.y))
+                        .style("fill", d => d.color );
+
+                that.svg.xaxis = that.svg.append('g').attr('transform', scatter.translate(0, config_data.height)).call(d3.axisBottom(x));
+                that.svg.yaxis = that.svg.append('g').call(d3.axisLeft(y));
+            };
+            that.dataset_update = function() {
+
+                let config_data = that.getData();
+
+                let x = that.getXScale(config_data.table_data, config_data.width);
+                let y = that.getYScale(config_data.table_data, config_data.height);
+
+                that.svg.selectAll("circle").data(config_data.table_data)
+                    .transition()
+    					.duration(500)
+                        .attr('r', d => d.size)
+                        .attr('cx', d => x(d.x))
+                        .attr('cy', d => y(d.y))
+                        .style("fill", d => d.color);
+
+                that.svg.xaxis
+                    .transition()
+                        .duration(500)
+                        .attr('transform', scatter.translate(0, config_data.height))
+                        .call(d3.axisBottom(x));
+                that.svg.yaxis
+                    .transition()
+                        .duration(500)
+                        .call(d3.axisLeft(y));
+            };
+            return that;
+        })();
+        var bar = (function() {
+            var that = { "svg"   : "", "xaxis" : "", "yaxis" : "", "count" : 10 };
+            that.getData = function() {
+                var return_data = { "table_data" : [] };
+                let alphabet    = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
+                let color       = [
+                    "hsl(25.945787760711248,100%,50%)", "hsl(63.5791161053173,100%,50%)", "hsl(128.77403977176442,100%,50%)",
+                    "hsl(337.19393268822816,100%,50%)", "hsl(149.1061880483991,100%,50%)", "hsl(172.82391743885182,100%,50%)",
+                    "hsl(260.6362447596605,100%,50%)", "hsl(245.2129328933139,100%,50%)", "hsl(343.8059170193441,100%,50%)",
+                    "hsl(400.22196625689724,100%,50%)"
+                ];
+                var ind         = 0;
+                do {
+                    return_data.table_data.push({
+                        "val"   : parseInt(helper.getRandomNumber(0, 100)),
+                        "text"  : alphabet[ind],
+                        "color" : color[ind++]
+                     });
+                } while(return_data.table_data.length < that.count);
+
+                return_data.elemSize    = helper.getElementSize();
+                return_data.margin      = {top: 20, right: 0, bottom: 30, left: 40};
+                return_data.width       = return_data.elemSize.width - return_data.margin.left - return_data.margin.right;
+                return_data.height      = return_data.elemSize.height - return_data.margin.top - return_data.margin.bottom;
+
+                return_data.barPadding  = 2;
+                return_data.barWidth    = (return_data.width / return_data.table_data.length);
+                return return_data;
+            };
+            that.getXScale = function(table_data, width) {
+                return d3.scaleLinear().domain([d3.min(table_data, d => 0), d3.max(table_data, d => (that.count - 1) )]).range([0, width ]);
+            };
+            that.getYScale = function(table_data, height) {
+                return d3.scaleLinear().domain([d3.min(table_data, d => d.val), d3.max(table_data, d => d.val)]).range([height, 0]);
+            };
+            that.translate = function(x, y) { return 'translate(' + x + ', ' + y + ')'; };
+            that.init = function() {
+
+                let config_data = that.getData();
+
+                that.svg = d3.select('#barplot')
+                    .attr("width", config_data.elemSize.width)
+                    .attr("height", config_data.elemSize.height);
+
+                let x       = that.getXScale(config_data.table_data, config_data.elemSize.width);
+                let y       = that.getYScale(config_data.table_data, config_data.height);
+
+                let bars    = that.svg.selectAll('rect').data(config_data.table_data);
+                bars.enter().append('rect')
+                    .merge(bars)
+                    .attr("y", function(d) {
+                        var orig = config_data.elemSize.height - config_data.margin.bottom - 20;
+                        var size = (orig * d.val) / 100;
+                        return (orig - size);
+                    })
+                    .attr("width", (config_data.barWidth - config_data.barPadding))
+                    .attr("height", function(d) {
+                        var orig = config_data.elemSize.height - config_data.margin.bottom - 20;
+                        var size = (orig * d.val) / 100;
+                        return size;
+                    })
+                    .attr("transform", function(d, i) {
+                        var offset = i * (config_data.barWidth + config_data.barPadding);
+                        offset = offset + config_data.margin.left + 10;
+                        return 'translate('+offset+', 0)';
+                    })
+                    .style("fill", d => d.color);
+
+                let xaxis = that.svg.append('g').attr('transform', bar.translate(config_data.margin.left, config_data.height)).call(d3.axisBottom(x));
+                that.svg.yaxis = that.svg.append('g').attr('transform', bar.translate(config_data.margin.left, 0)).call(d3.axisLeft(y));
+
+                xaxis.selectAll("g").attr('transform', function(d, i) {
+                        var offset = i * ((config_data.barWidth) + config_data.barPadding);
+                        offset = offset + config_data.margin.left - 4;
+                        return 'translate('+offset+', 0)';
+                    });
+                xaxis.selectAll("text").each(function (d, i) {
+                    d3.select(this).text(config_data.table_data[i].text);
+                });
+            };
+            that.dataset_update = function() {
+                let config_data = that.getData();
+
+                let y = that.getYScale(config_data.table_data, config_data.height);
+
+                that.svg.selectAll('rect').data(config_data.table_data)
+                    .transition()
+    					.duration(500)
+                        .attr("y", function(d) {
+                            var orig = config_data.elemSize.height - config_data.margin.bottom - 20;
+                            var size = (orig * d.val) / 100;
+                            return (orig - size);
+                        })
+                        .attr("height", function(d) {
+                            var orig = config_data.elemSize.height - config_data.margin.bottom - 20;
+                            var size = (orig * d.val) / 100;
+                            return size;
+                        });
+
+                that.svg.yaxis
+                    .transition()
+                        .duration(500)
+                        .call(d3.axisLeft(y));
+            };
+            return that;
+        })();
+        (function() {
+            scatter.init();
+            bar.init();
+        })();
+    </script>
+</html>
