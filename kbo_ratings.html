@@ -1,0 +1,589 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+        <meta name="description" content="">
+        <meta name="author" content="강필구">
+
+        <title>정보시각화</title>
+
+        <script src="https://d3js.org/d3.v5.min.js"></script>
+        <style>
+            @charset "utf-8"; *{margin:0;padding:0;}
+            html, body {margin: 0px; padding: 0px; border: 0px; width: 100%; height: 100%; -webkit-font-smoothing: antialiased; background-color: #fff; }
+            .row{ font-size: 0px; display: block;} .row .col { display: inline-block; font-size: 12px; width: 33.33%;  box-sizing: border-box; vertical-align: top; padding-left: 20px; min-width: 510px}
+            .text-center{ text-align: center;} .text-right{ text-align: right;}
+            h1{font-size: 24px;} h2{font-size: 16px;} select { display: block; width: auto;}
+        </style>
+    </head>
+    <body>
+        <div class="row text-center">
+            <h1>정보시각화</h1>
+        </div>
+        <!--/.row-->
+
+        <div class="row">
+            <div style="font-size: 22px; padding-left: 20px; font-weight: bold">
+                KBO Ratings
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col" id="table_section">
+            </div>
+            <!--/.col-->
+
+            <div class="col" id="line_graph_section"></div>
+            <!--/.col-->
+
+            <div class="col" id="line_bar_section"></div>
+            <!--/.col-->
+        </div>
+        <!--/.row-->
+
+        <div class="" style="font-size: 11px;">
+            <br><br><br>
+            원본 코드 돌아가는거 확인 가능<a href="http://philgookang.com/snu/hw2.html">http://philgookang.com/snu/hw2.html</a>
+        </div>
+    </body>
+    <script>
+        var Brain = (function() {
+            var that = { data : {}, color : {}, color_index : 0 };
+            that.setData = function(_data) { that.data = _data; };
+            that.getData = function(queries) {
+                var return_data = that.data;
+                if (queries.year) {
+                    for (var i  = 0; i < that.data.length; i++) {
+                        if (that.data[i].year == queries.year) {
+                            return_data = that.data[i].rankings;
+                            break;
+                        }
+                    }
+                }
+                return return_data;
+            };
+            that.getTableColumnNames = () => ['rank', 'team', 'W', 'D', 'L', 'win_rate', 'diff_game'];
+            that.sortDataByColumnNames = function(data) { return that.getTableColumnNames().map(each_key => [each_key, data[each_key]]); };
+            that.getYearData = () => that.data.map(d => d.year);
+            that.getLineGraphSortData = () => [{name: 'WR', value: "win_rate"}, {name: 'DG', value: "diff_game"}];
+            that.getBarGraphSortData = () => ['W', "D", "L"];
+            that.getColor = function(key) {
+                if (!that.color[key]) {
+                    var color_list = ["#D50000", "#C51162", "#6200EA", "#304FFE", "#01579B", "#006064", "#64FFDA", "#1B5E20", "#B2FF59", "#F57F17", "#FFAB91", "#795548", "#00B0FF", "#AB47BC", "#FF80AB", "#AA00FF", "#D50000", "#C51162", "#6200EA", "#304FFE", "#01579B", "#006064", "#64FFDA", "#1B5E20", "#B2FF59", "#F57F17", "#FFAB91", "#795548", "#00B0FF", "#AB47BC", "#FF80AB", "#AA00FF"];
+                    that.color[key] = color_list[that.color_index];
+                    that.color_index++;
+                }
+                return that.color[key];
+            };
+            return that;
+        })();
+        var Metrics = (function() {
+            return {
+                cellWidth : 55, cellHeight: 50,
+                table_full_width : 500, table_full_height : 500,
+                bar_col_width : 20, bar_padding : 0,
+                bar_full_width : 500, bar_full_height : 500, bar_margins : 40,
+                bar_width: (500 - 80), bar_height: (500 - 80),
+                line_full_width : 500, line_full_height : 500, line_margins : 40,
+                line_width : (500 - 80), line_height : (500 - 80),
+                line_col_width: 0
+            };
+        })();
+        var VisualInterface = (function() {
+            var that = {};
+            that.init = function(file_url) {
+                that.load_data_from_url(file_url, function(data) {
+                    Brain.setData(data);
+                    that.create.table_options();
+                    that.create.table();
+                    that.create.line_graph();
+                    that.create.bar_graph();
+                });
+            };
+            that.load_data_from_url = function(file_url, callback) { d3.json(file_url).then(callback); };
+            that.create = {
+                table_options : function() {
+
+                    that.select_year = d3.select('#table_section').append('select').attr('id', 'select_year').on('change', that.event.change);
+                    let option_year = that.select_year.selectAll('option').data( Brain.getYearData() );
+                    option_year.enter().append('option').merge(option_year).text(k => k);
+
+                    that.select_line_graph = d3.select('#table_section').append('select').attr('id', 'select_line_graph').on('change', that.event.change);
+                    let option_line_graph = that.select_line_graph.selectAll('option').data( Brain.getLineGraphSortData() );
+                    option_line_graph.enter().append('option').merge(option_line_graph).attr('value', d => d.value).text(d => d.name);
+
+                    that.select_bar_graph = d3.select('#table_section').append('select').attr('id', 'select_bar_graph').on('change', that.event.change);
+                    let option_bar_graph = that.select_bar_graph.selectAll('option').data( Brain.getBarGraphSortData() );
+                    option_bar_graph.enter().append('option').merge(option_bar_graph).text(k => k);
+                },
+                table : function() {
+
+                    let svg = d3.select("#table_section").append('svg').attr('width', Metrics.table_full_width).attr('height', Metrics.table_full_height);
+
+                    let thead = svg.append('g').attr("name", "thead");
+                    thead.selectAll('text').data(Brain.getTableColumnNames()).enter().append('text')
+                            .attr('x', (d, i) => (Metrics.cellWidth * i) ).attr('y', (d, i) => Metrics.cellHeight )
+                            .attr("width", Metrics.cellWidth).attr("height", Metrics.cellHeight)
+                            .style("font-size", "12px").style("fill", "#000")
+                            .text(d => d);
+
+                    that.tbody = svg.append('g').attr("name", "tbody");
+                    that.update.table(true);
+                },
+                line_graph : function() {
+
+                    var return_data = that.helper.get_data_from_table_for_line(that.select_line_graph.property("value"));
+                    var empty_list  = [];
+                    Metrics.line_col_width = (Metrics.line_width/return_data.year_list.length);
+                    var aaa = (Metrics.line_width/7);
+
+                    for (var o = 0; o < 8; o++)
+                        empty_list.push( (aaa * o) + Metrics.line_margins + 1 );
+
+                    let svg         = d3.select("#line_graph_section").append('svg').attr('width', Metrics.line_full_width).attr('height', Metrics.line_full_height);
+
+                    let xx           = d3.scaleOrdinal().domain([1985, 1990, 1995, 2000, 2005, 2010, 2015]).range(empty_list);
+                    that.line_xaxis  = svg.append('g').attr('transform', 'translate(0, '+ (Metrics.line_width) +')').call(d3.axisBottom(xx));
+
+                    that.line_xaxis.selectAll("g").each(function (d, i) {
+                        var move = (empty_list[i]) + (aaa/2);
+                        d3.select(this).attr('transform', 'translate('+move+', 0)');
+                    });
+
+                    let yy           = d3.scaleLinear().domain([d3.min(return_data.sort_list, function(d) { return 0; }), d3.max(return_data.sort_list, d => parseFloat(d) )]).range([Metrics.bar_height, 0]);
+                    that.line_yaxis  = svg.append('g').attr('transform', 'translate('+Metrics.line_margins+', 0)').call(d3.axisLeft(yy));
+
+                    that.line        = svg.append('g').attr("name", "line_plot");
+
+                    that.update.line(true);
+                },
+                bar_graph : function() {
+
+                    that.bar                = d3.select("#line_bar_section").append('svg').attr('width', Metrics.bar_full_width).attr('height', Metrics.bar_full_height);
+                    that.bar_defs           = that.bar.append("defs");
+                    that.filter             = that.bar_defs.append("filter").attr("id", "bob");
+
+                    var component           = that.filter.append("feComponentTransfer");
+                    component.append("feFuncR").attr("type", "linear").attr("slope", "0.5")
+                    component.append("feFuncG").attr("type", "linear").attr("slope", "0.5")
+                    component.append("feFuncB").attr("type", "linear").attr("slope", "0.5")
+
+                    // var filter = defs.append("filter").attr("id", "drop-shadow").attr("height", "130%");
+
+                    var return_list         = that.helper.get_data_from_table(that.select_bar_graph.property("value")), empty_list  = [];
+                    Metrics.bar_col_width   = ((Metrics.bar_width - Metrics.bar_margins) / return_list.data_list.length);
+
+                    for (var i = 0; i < (return_list.team_list.length + 1); i++)
+                        empty_list.push( ((i * Metrics.bar_col_width) + ((Metrics.bar_margins) + (i * Metrics.bar_padding))) );
+
+                    let x           = d3.scaleOrdinal().domain(return_list.team_list).range(empty_list);
+                    let y           = d3.scaleLinear().domain([d3.min(return_list.data_list, d => (parseFloat(d.sort) - 10)), d3.max(return_list.data_list, d => (parseFloat(d.sort) + 10))]).range([Metrics.bar_height, 0]);
+                    that.bar_xaxis  = that.bar.append('g').attr('transform', 'translate('+Metrics.bar_margins+', '+ (Metrics.bar_width + Metrics.bar_margins) +')').call(d3.axisBottom(x));
+                    that.bar_yaxis  = that.bar.append('g').attr('transform', 'translate('+Metrics.bar_margins+', '+Metrics.bar_margins+')').call(d3.axisLeft(y));
+
+                    that.update.bar(true);
+                }
+            };
+            that.event = {
+                change: function(e) {
+                    that.update.table(false);
+                    that.update.bar(false);
+                    that.update.line(false);
+                },
+                mouseover: function(team) {
+
+                    that.tbody.selectAll('g').each(function() {
+                        var element = d3.select(this);
+                        if (element.attr("team") == team) {
+                            element.selectAll('text').each(function() {
+                                d3.select(this).style("font-weight", "900");
+                            });
+                        } else {
+                            element.selectAll('text').each(function() {
+                                d3.select(this).style("font-weight", "400");
+                            });
+                        }
+                    });
+
+                    that.line.selectAll('path').each(function() {
+                        var element = d3.select(this);
+                        if (element.attr("team") == team) {
+                            element.attr("stroke-width", 5);
+                        } else {
+                            element.attr("stroke-width", 1);
+                        }
+                    });
+
+                    that.bar.selectAll('rect').each(function() {
+                        var element = d3.select(this);
+                        if (element.attr("team") == team) {
+                            element.style("filter", "url(#bob)");
+
+                            // element.style("-webkit-filter", 'brightness(0.5)');
+                        } else {
+                            element.style("filter", "none");
+                            // element.style("-webkit-filter", 'brightness(1)');
+                        }
+                    });
+
+                    that.bar_xaxis.selectAll("text").each(function (d, i) {
+                        var element = d3.select(this);
+                        if (element.text() == team) {
+                            element.style("font-weight", "900");
+                        } else {
+                            element.style("font-weight", "400");
+                        }
+                    });
+
+                },
+                mouseout: function(team) {
+                    that.event.mouseover("");
+                }
+            };
+            that.helper = {
+                table_row_add : function(row, row_data_list, animation) {
+                    row.on('mouseover', function(k) { that.event.mouseover(d3.select(this).attr('team')); })
+                    row.on('mouseout', function(k) { that.event.mouseout(d3.select(this).attr('team')); })
+                    var rank = parseInt(row_data_list.rank);
+                    var row_data_list = Brain.sortDataByColumnNames(row_data_list);
+                    for (var cnt = 0; cnt < row_data_list.length; cnt++) row.attr(row_data_list[cnt][0], row_data_list[cnt][1]);
+                    row.attr("color", Brain.getColor(row.attr("team")))
+                    row.selectAll('text').data(row_data_list).enter().append('text')
+                            .attr('x', (d, i) => (Metrics.cellWidth * i) ).attr('y', (d, i) => (Metrics.cellHeight * (rank + 1)) )
+                            .attr("animation", animation).attr("width", Metrics.cellWidth).attr("height", Metrics.cellHeight)
+                            .style("font-size", "12px").style("fill", "#000").text(d => d[1])
+                            .each(function(d) { if (animation == "fadein") { d3.select(this).style('opacity', 0); } });
+                },
+                bar_add_row : function(empty_list, data_list, x, y , animation) {
+
+                    that.bar.append('rect').data(data_list)
+                        .attr("x", function(d, i) {
+                            return (((d.rank-1) * Metrics.bar_col_width) + ((Metrics.bar_margins + 1) + ((d.rank-1) * Metrics.bar_padding)))
+                        })
+                        .attr("y", (d) => y(d.sort) + Metrics.bar_margins)
+                        .attr("sort", (d) => d.sort )
+                        .attr("animation", animation )
+                        .attr("width", Metrics.bar_col_width)
+                        .attr("height", (d) => (Metrics.bar_height - y(d.sort)))
+                        .style("fill", d => d.color)
+                        .each(function(d, i) {
+
+                            d3.select(this).on('mouseover', function(k) { that.event.mouseover(d3.select(this).attr('team')); })
+                            d3.select(this).on('mouseout', function(k) { that.event.mouseout(d3.select(this).attr('team')); })
+
+                            for (var key in d){ d3.select(this).attr(key, d[key]); }
+                            if (animation == "fadein") { d3.select(this).style('opacity', 0); }
+                        });
+                },
+                get_data_from_table : function(attr_name) {
+                    var largest = 0, data_list = [], team_list = [];
+                    var key_list = Brain.getTableColumnNames();
+                    that.tbody.selectAll('g').each(function(d, cnt) {
+                        var row = {};
+                        for (var i = 0; i < key_list.length; i++) row[key_list[i]] = d3.select(this).attr(key_list[i]);
+                        row.sort = d3.select(this).attr(attr_name);
+                        row.color = d3.select(this).attr("color");
+                        largest = (cnt) ?    (row.sort > largest) ? row.sort : largest   : row.sort;
+                        team_list[(row.rank-1)] = d3.select(this).attr("team");
+                        data_list.push(row);
+                    });
+                    return {"largest" : largest, "data_list" : data_list, "team_list" : team_list};
+                },
+                get_current_team : function(attr_name) {
+                    var team_list = [];
+                    that.tbody.selectAll('g').each(function(d, cnt) {
+                        var rank = parseInt(d3.select(this).attr("rank"));
+                        team_list[(rank-1)] = d3.select(this).attr("team");
+                    });
+                    return team_list;
+                },
+                get_data_from_table_for_line : function(attr_name) {
+
+                    var filter_team_list= that.helper.get_current_team();
+                    var largest         = 0;
+                    var key_list        = Brain.getTableColumnNames();
+                    var data_list       = Brain.getData({});
+                    var team_list       = {};
+                    var year_list       = [];
+                    var sort_list       = [];
+
+                    for(var i = 0; i < data_list.length; i++) {
+                        var year        = data_list[i].year;
+                        var rankings    = data_list[i].rankings;
+                        year_list.push(year);
+
+                        for (var j = 0; j < rankings.length; j++) {
+                            var oneset  = rankings[j];
+                            var team    = oneset["team"];
+                            var sort    = oneset[attr_name];
+
+                            if (!filter_team_list.includes(team))  continue;
+
+                            if (!team_list[team]) team_list[team] = [];
+
+                            sort_list.push(sort);
+                            team_list[team].push({ "year" : year, "sort" : sort });
+
+                            if (largest < sort) largest = sort;
+                        }
+                        // end for
+                    }
+                    // end for
+
+                    return  { "largest" : largest, "data_list" : team_list, "year_list" : year_list, "sort_list" : sort_list };
+                }
+            };
+            that.update = {
+                table: function(animation_status) {
+
+                    var animation       = (animation_status) ? "" : "fadein";
+                    var year            = that.select_year.property("value");
+                    var new_data_list   = Brain.getData({'year':year});
+                    var remove_list     = [];
+                    var process_list    = [];
+
+                    that.tbody.selectAll('g').each(function() {
+                        var element = d3.select(this);
+                        var is_found = false;
+                        for (var i = 0; i < new_data_list.length; i++)
+                            if (element.attr("team") == new_data_list[i].team) {
+                                is_found = true;
+                                var row_data_list = Brain.sortDataByColumnNames(new_data_list[i]);
+                                element.selectAll('text').each(function(d, aa) {
+                                    d3.select(this).attr("animation", "move").text(row_data_list[aa][1]);
+                                });
+                                process_list.push(element);
+                                break;
+                            }
+                        if (is_found == false) remove_list.push(element);
+                    });
+
+                    // 삭제 작업
+                    for(var i = 0; i < remove_list.length; i++) remove_list[i].remove();
+
+                    // 추가 작업
+                    for (var i = 0; i < new_data_list.length; i++) {
+
+                        var need_to_add = true;
+
+                        for (var j = 0; j < process_list.length; j++) {
+                            var element = process_list[j];
+                            if (element.attr("team") == new_data_list[i].team) {
+                                var row_data_list = Brain.sortDataByColumnNames(new_data_list[i]);
+                                for (var cnt = 0; cnt < row_data_list.length; cnt++)
+                                    element.attr(row_data_list[cnt][0], row_data_list[cnt][1]);
+                                need_to_add = false;
+                                break;
+                            }
+                        }
+
+                        if (need_to_add) that.helper.table_row_add(that.tbody.append('g'), new_data_list[i], animation);
+                    }
+
+                    // animation 실행!
+                    that.tbody.selectAll('g').each(function() {
+                        var row  = d3.select(this);
+                        var rank = parseInt(row.attr('rank'));
+                        row.selectAll('text').each(function(d, i) {
+                            var column_element  = d3.select(this);
+                            var animation       = column_element.attr('animation');
+                            if (animation == "move") {
+                                column_element.transition().duration(1000).attr("y", (d) => (Metrics.cellHeight * (rank + 1)) )
+                            } else if (animation == "fadein") {
+                                column_element.transition().duration(1000).style("opacity", 1 )
+                            } else {
+                                // do nothing!
+                            }
+                        });
+                    });
+                },
+                bar: function(animation_status) {
+
+                    var animation       = (animation_status) ? "" : "fadein";
+                    var new_return_list = that.helper.get_data_from_table(that.select_bar_graph.property("value"));
+                    var remove_list     = [];
+                    var process_list    = [];
+                    Metrics.bar_col_width = ((Metrics.bar_width - Metrics.bar_margins) / new_return_list.data_list.length);
+                    var empty_list  = [];
+
+                    for (var g = 0; g < (new_return_list.team_list.length + 1); g++) {
+                        empty_list.push( ((g * Metrics.bar_col_width) + ( + (g * Metrics.bar_padding))) );
+                    }
+
+                    let x   = d3.scaleOrdinal().domain(new_return_list.team_list).range(empty_list);
+                    let y   = d3.scaleLinear().domain([d3.min(new_return_list.data_list, d => 0), d3.max(new_return_list.data_list, d => (parseInt(d.sort)))]).range([Metrics.bar_height, 0]);
+
+                    that.bar_xaxis.call(d3.axisBottom(x));
+                    that.bar_yaxis.transition().duration(500).call(d3.axisLeft(y));
+
+                    that.bar_xaxis.selectAll("g").each(function (d, i) {
+                        var move = (empty_list[i]) + (Metrics.bar_col_width/2);
+                        d3.select(this).attr('transform', 'translate('+move+', 0)');
+                    });
+
+                    that.bar.selectAll('rect').each(function() {
+                        var element = d3.select(this);
+                        var is_found = false;
+                        for (var i = 0; i < new_return_list.data_list.length; i++)
+                            if (element.attr("team") == new_return_list.data_list[i].team) {
+                                is_found = true;
+                                element.attr("animation", "move")
+                                element.attr("width", Metrics.bar_col_width)
+                                for (var key in new_return_list.data_list[i]) { element.attr(key, new_return_list.data_list[i][key]); }
+                                process_list.push(element);
+                                break;
+                            }
+                        if (is_found == false) remove_list.push(element);
+                    });
+
+                    // 삭제 작업
+                    for(var i = 0; i < remove_list.length; i++) remove_list[i].remove();
+
+                    // 추가 작업
+                    for (var i = 0; i < new_return_list.data_list.length; i++) {
+
+                        var need_to_add = true;
+
+                        for (var j = 0; j < process_list.length; j++)
+                            if (process_list[j].attr("team") == new_return_list.data_list[i].team) {
+                                need_to_add = false;
+                                break;
+                            }
+
+                        if (need_to_add) that.helper.bar_add_row(empty_list, [new_return_list.data_list[i]], x, y, animation);
+                    }
+
+                    // animation 실행!
+                    that.bar.selectAll('rect').each(function() {
+                        var col         = d3.select(this);
+                        var animation   = col.attr('animation');
+                        if (animation == "move") {
+                            col.transition().duration(1000)
+                                .attr("x", function() {
+                                    for (var i = 0; i < new_return_list.data_list.length; i++)
+                                        if (col.attr("team") == new_return_list.data_list[i].team) {
+                                            var rank = new_return_list.data_list[i].rank;
+                                            var move = (((rank-1) * Metrics.bar_col_width) + ((Metrics.bar_margins + 1) + ((rank-1) * Metrics.bar_padding)));
+                                            return move;
+                                        }
+                                    return 0;
+                                })
+                                .attr("y", function() {
+                                    for (var i = 0; i < new_return_list.data_list.length; i++)
+                                        if (col.attr("team") == new_return_list.data_list[i].team) {
+                                            return (y(new_return_list.data_list[i].sort) + Metrics.bar_margins);
+                                        }
+                                    return 0;
+                                })
+                                .attr("height", function() {
+                                    for (var i = 0; i < new_return_list.data_list.length; i++)
+                                        if (col.attr("team") == new_return_list.data_list[i].team) {
+                                            return (Metrics.bar_height -  y(new_return_list.data_list[i].sort));
+                                        }
+                                    return 0;
+                                })
+                        } else if (animation == "fadein") {
+                            col.transition().duration(1000).style("opacity", 1 )
+                        } else {
+                            // do nothing!
+                        }
+                    });
+                },
+                line: function(animation_status) {
+
+                    var animation       = (animation_status) ? "" : "fadein";
+                    var return_data     = that.helper.get_data_from_table_for_line(that.select_line_graph.property("value"));
+                    var remove_list     = [ ];
+                    var process_list    = [ ];
+                    Metrics.line_col_width = (Metrics.line_width/return_data.year_list.length);
+
+                    let yy = d3.scaleLinear().domain([d3.min(return_data.sort_list, function(d) { return parseFloat(d); }), d3.max(return_data.sort_list, d => parseFloat(d) )]).range([Metrics.line_height, Metrics.line_margins]);
+                    that.line_yaxis.transition().duration(500).call(d3.axisLeft(yy));
+
+                    that.line.selectAll('path').each(function() {
+                        var element = d3.select(this);
+                        var is_found = false;
+                        for(var key in return_data.data_list)
+                            if (element.attr("team") == key) {
+                                is_found = true;
+                                element.attr("animation", "move")
+
+                                var team_data = return_data.data_list[key];
+                                var line = d3.line()
+                                                .x(function(d) {
+                                                    for(var i = 0; i < return_data.year_list.length; i++)
+                                                        if (return_data.year_list[i] == d.year)
+                                                            return (Metrics.line_col_width * i) + Metrics.line_margins + 1;
+                                                })
+                                                .y(function(d) { return yy(d.sort); })
+
+                                element.transition().duration(500).attr("d", line(team_data));
+
+                                process_list.push(element);
+                                break;
+                            }
+                        if (is_found == false) remove_list.push(element);
+                    });
+
+                    // 삭제 작업
+                    for(var i = 0; i < remove_list.length; i++) remove_list[i].remove();
+
+                    // 추가 작업
+                    for(var key in return_data.data_list) {
+
+                        var need_to_add = true;
+
+                        for (var j = 0; j < process_list.length; j++)
+                            if (process_list[j].attr("team") == key) {
+                                need_to_add = false;
+                                break;
+                            }
+
+                        if (need_to_add) {
+
+                            var team_data = return_data.data_list[key];
+                            var line = d3.line()
+                                            .x(function(d) {
+                                                for(var i = 0; i < return_data.year_list.length; i++)
+                                                    if (return_data.year_list[i] == d.year)
+                                                        return (Metrics.line_col_width * i) + Metrics.line_margins + 1;
+                                            })
+                                            .y(function(d) { return yy(d.sort); })
+
+                            pp = that.line.append('path')
+                                    .attr("stroke", Brain.getColor(key))
+                                    .attr("stroke-width", 1)
+                                    .attr("fill", "none")
+                                    .attr("animation", animation)
+                                    .attr("team", key)
+
+                            pp.on('mouseover', function(k) { that.event.mouseover(d3.select(this).attr('team')); })
+                            pp.on('mouseout', function(k) { that.event.mouseout(d3.select(this).attr('team')); })
+
+                            if (animation == "move") {
+                                pp.transition()
+                                  .duration(1000)
+                                  .attr("d", line(team_data))
+                            } else if (animation == "fadein") {
+                                pp.style("opacity", 0)
+                                  .attr("d", line(team_data))
+                                  .transition()
+                                  .duration(1000)
+                                  .style("opacity", 1 );
+                            } else {
+                                pp.attr("d", line(team_data))
+                            }
+                        }
+                    }
+                }
+            };
+            return that;
+        })();
+        (function() {
+            // var file_url = "http://philgookang.com/snu/data.json";
+            var file_url = "data.json";
+            VisualInterface.init(file_url);
+        })();
+    </script>
+</html>
